@@ -1,9 +1,9 @@
 {
-  "id": "three-state-checklist",
-  "name": "Three State Checklist",
+  "id": "obsidian-better-checklists",
+  "name": "Better Checklists",
   "version": "1.0.0",
   "minAppVersion": "0.15.0",
   "description": "Adds a third 'cancelled' state to Obsidian checklists",
-  "author": "Your Name",
+  "author": "Armaan Gupta",
   "isDesktopOnly": false
 }

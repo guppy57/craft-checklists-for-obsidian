@@ -1,9 +1,11 @@
-import { Plugin, MarkdownView } from 'obsidian';
-import { PluginSettings, DEFAULT_SETTINGS, CheckboxState } from './types';
-import { CheckboxService } from './services/checkbox-service';
+import { Plugin, MarkdownView } from "obsidian";
+import { PluginSettings, DEFAULT_SETTINGS, CheckboxState } from "./types";
+import { CheckboxService } from "./services/checkbox-service";
+import { EditorService } from "./services/editor-service";
 
 export default class ThreeStateChecklistPlugin extends Plugin {
   settings: PluginSettings;
+  private editorService: EditorService | null = null;
 
   async onload() {
     await this.loadSettings();
@@ -12,11 +14,11 @@ export default class ThreeStateChecklistPlugin extends Plugin {
   }
 
   private registerCheckboxClickHandler() {
-    this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+    this.registerDomEvent(document, "click", (evt: MouseEvent) => {
       const target = evt.target as HTMLElement;
-      
+
       // Check if clicked element is a checkbox
-      if (!target.classList.contains('task-list-item-checkbox')) {
+      if (!target.classList.contains("task-list-item-checkbox")) {
         return;
       }
 
@@ -24,52 +26,30 @@ export default class ThreeStateChecklistPlugin extends Plugin {
       evt.preventDefault();
       evt.stopPropagation();
 
-      const listItem = target.closest('.task-list-item');
+      const listItem = target.closest(".task-list-item");
       if (!listItem) return;
+
+      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (!view) return;
+
+      // Initialize editor service if needed
+      if (!this.editorService || view !== this.editorService.view) {
+        this.editorService = new EditorService(view);
+      }
 
       // Get current state and calculate next state
       const currentState = CheckboxService.getCheckboxState(listItem);
       const nextState = CheckboxService.getNextState(currentState);
 
-      // Update the checkbox state
+      // Update the checkbox state in DOM
       CheckboxService.updateCheckboxState(listItem, nextState);
 
       // Update the markdown content
-      this.updateMarkdownContent(listItem, nextState);
+      const lineNumber = this.editorService.getLineNumberFromElement(listItem);
+      if (lineNumber !== -1) {
+        this.editorService.updateCheckboxInLine(lineNumber, nextState);
+      }
     });
-  }
-
-  private async updateMarkdownContent(listItem: HTMLElement, state: CheckboxState) {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view) return;
-
-    const editor = view.editor;
-    const lineNumber = this.getLineNumberFromElement(listItem);
-    if (lineNumber === -1) return;
-
-    const line = editor.getLine(lineNumber);
-    const newLine = line.replace(
-      /\[[\sx]\]/i,
-      state === CheckboxState.UNCHECKED ? '[ ]' :
-      state === CheckboxState.CHECKED ? '[x]' : '[x]'
-    );
-
-    editor.transaction({
-      changes: [{
-        from: { line: lineNumber, ch: 0 },
-        to: { line: lineNumber, ch: line.length },
-        text: newLine
-      }]
-    });
-  }
-
-  private getLineNumberFromElement(element: HTMLElement): number {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view) return -1;
-
-    const cmEditor = view.editor;
-    const pos = cmEditor.posAtDOM(element);
-    return pos ? pos.line : -1;
   }
 
   async loadSettings() {
@@ -81,8 +61,8 @@ export default class ThreeStateChecklistPlugin extends Plugin {
   }
 
   private loadStyles() {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'three-state-checklist-styles';
+    const styleEl = document.createElement("style");
+    styleEl.id = "three-state-checklist-styles";
     styleEl.textContent = `
       .task-list-item-checkbox {
         border-radius: 0 !important;
@@ -117,7 +97,7 @@ export default class ThreeStateChecklistPlugin extends Plugin {
   }
 
   onunload() {
-    const styleEl = document.getElementById('three-state-checklist-styles');
+    const styleEl = document.getElementById("three-state-checklist-styles");
     if (styleEl) {
       styleEl.remove();
     }
